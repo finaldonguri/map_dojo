@@ -1,0 +1,8 @@
+{
+"type": "FeatureCollection",
+"name": "dojoB",
+"crs": { "type": "name", "properties": { "name": "urn:ogc:def:crs:OGC:1.3:CRS84" } },
+"features": [
+{ "type": "Feature", "properties": { "id": null, "dojoB": null }, "geometry": { "type": "MultiLineString", "coordinates": [ [ [ 135.268016508585703, 34.868577144026894 ], [ 135.279153323744339, 34.869041754901545 ], [ 135.28708122606065, 34.878604412245679 ], [ 135.290384518692491, 34.876707455305308 ] ] ] } }
+]
+}
