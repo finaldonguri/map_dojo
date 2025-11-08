@@ -1,0 +1,18 @@
+{
+"type": "FeatureCollection",
+"name": "dojo_plots",
+"crs": { "type": "name", "properties": { "name": "urn:ogc:def:crs:OGC:1.3:CRS84" } },
+"features": [
+{ "type": "Feature", "properties": { "id": 1, "dojo_plots": "1" }, "geometry": { "type": "MultiPoint", "coordinates": [ [ 135.268102855045328, 34.86791223312818 ] ] } },
+{ "type": "Feature", "properties": { "id": 2, "dojo_plots": "2" }, "geometry": { "type": "MultiPoint", "coordinates": [ [ 135.272092579146005, 34.868188619584338 ] ] } },
+{ "type": "Feature", "properties": { "id": 3, "dojo_plots": "3" }, "geometry": { "type": "MultiPoint", "coordinates": [ [ 135.2755454274442, 34.869371888597385 ] ] } },
+{ "type": "Feature", "properties": { "id": 4, "dojo_plots": "4" }, "geometry": { "type": "MultiPoint", "coordinates": [ [ 135.277492918100194, 34.869881466357448 ] ] } },
+{ "type": "Feature", "properties": { "id": 5, "dojo_plots": "5" }, "geometry": { "type": "MultiPoint", "coordinates": [ [ 135.282935364960451, 34.871531094734046 ] ] } },
+{ "type": "Feature", "properties": { "id": 6, "dojo_plots": "6" }, "geometry": { "type": "MultiPoint", "coordinates": [ [ 135.283354250243519, 34.872714781788908 ] ] } },
+{ "type": "Feature", "properties": { "id": 7, "dojo_plots": "7" }, "geometry": { "type": "MultiPoint", "coordinates": [ [ 135.284022089840818, 34.873732325977016 ] ] } },
+{ "type": "Feature", "properties": { "id": 8, "dojo_plots": "8" }, "geometry": { "type": "MultiPoint", "coordinates": [ [ 135.287647504797604, 34.876993600682056 ] ] } },
+{ "type": "Feature", "properties": { "id": 9, "dojo_plots": "9" }, "geometry": { "type": "MultiPoint", "coordinates": [ [ 135.289364806619233, 34.877437124047518 ] ] } },
+{ "type": "Feature", "properties": { "id": 10, "dojo_plots": "10" }, "geometry": { "type": "MultiPoint", "coordinates": [ [ 135.287615702912007, 34.877384944952269 ] ] } },
+{ "type": "Feature", "properties": { "id": 11, "dojo_plots": "11" }, "geometry": { "type": "MultiPoint", "coordinates": [ [ 135.290573278271467, 34.876393535849175 ] ] } }
+]
+}
