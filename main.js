@@ -2,7 +2,27 @@
 Cesium.Ion.defaultAccessToken =
     "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiIyOGRiZmY3Yy0wNzRjLTQ2MjktOGQ0Ni0xYmI5MzFmNDUxZDAiLCJpZCI6MzU0MDY0LCJpYXQiOjE3NjE0NTQ3MDh9.p9q4yTuNNbVz7U09nx04n-LQG0sxXh8TDw22H3FSIV0";
 
-(async function () {
+(function () {
+    // ===== 画面に応じたUI倍率 =====
+    function computeUiScale() {
+        const small = window.matchMedia("(max-width: 600px)").matches;
+        const tiny = window.matchMedia("(max-width: 380px)").matches;
+        // 端末DPRも加味（上げすぎると重くなるので上限2）
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        // ベース倍率
+        let base = 1.0;
+        if (small) base = 1.25;
+        if (tiny) base = 1.4;
+        return base * (dpr >= 1.5 ? 1.0 : 1.0); // DPRで無理に上げない（負荷対策）
+    }
+    let uiScale = computeUiScale();
+
+    // CSS変数にも反映（ボタンなど）
+    document.documentElement.style.setProperty("--ui-scale", String(uiScale));
+
+    // ユーティリティ
+    const px = (n) => `${Math.round(n * uiScale)}px`;
+
     // ===== Viewer =====
     const viewer = new Cesium.Viewer("cesiumContainer", {
         baseLayerPicker: false,
@@ -17,130 +37,135 @@ Cesium.Ion.defaultAccessToken =
         viewer.imageryLayers.remove(viewer.imageryLayers.get(0), false);
     }
 
-    // 任意の見た目
+    // 見た目
     viewer.scene.globe.enableLighting = true;
     viewer.clock.currentTime = Cesium.JulianDate.fromDate(new Date("2024-06-21T12:00:00Z"));
     viewer.clock.shouldAnimate = false;
 
     // ===== 地形 =====
-    const terrainProvider = await Cesium.CesiumTerrainProvider.fromIonAssetId(2767062);
-    viewer.terrainProvider = terrainProvider;
+    (async () => {
+        viewer.terrainProvider = await Cesium.CesiumTerrainProvider.fromIonAssetId(2767062);
 
-    // ===== 画像レイヤー定義 =====
-    const layers = viewer.imageryLayers;
-
-    // 衛星（Ion）
-    const satelliteProvider = await Cesium.IonImageryProvider.fromAssetId(3830183);
-
-    // 地理院 標準地図
-    const gsiProvider = new Cesium.UrlTemplateImageryProvider({
-        url: "https://cyberjapandata.gsi.go.jp/xyz/std/{z}/{x}/{y}.png",
-        credit: new Cesium.Credit(
-            '<a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank">地理院タイル</a>'
-        ),
-        minimumLevel: 2,
-        maximumLevel: 18,
-    });
-
-    // 古地図
-    const providersOld = [
-        new Cesium.UrlTemplateImageryProvider({
-            url: "https://mapwarper.h-gis.jp/maps/tile/3544/{z}/{x}/{y}.png",
-            credit: new Cesium.Credit("『広根』五万分一地形圖, https://www.gsi.go.jp/"),
+        // ===== 画像レイヤー =====
+        const layers = viewer.imageryLayers;
+        const satelliteProvider = await Cesium.IonImageryProvider.fromAssetId(3830183);
+        const gsiProvider = new Cesium.UrlTemplateImageryProvider({
+            url: "https://cyberjapandata.gsi.go.jp/xyz/std/{z}/{x}/{y}.png",
+            credit: new Cesium.Credit('<a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank">地理院タイル</a>'),
             minimumLevel: 2,
             maximumLevel: 18,
-        }),
-    ];
+        });
+        const providersOld = [
+            new Cesium.UrlTemplateImageryProvider({
+                url: "https://mapwarper.h-gis.jp/maps/tile/3544/{z}/{x}/{y}.png",
+                credit: new Cesium.Credit("『広根』五万分一地形圖, https://www.gsi.go.jp/"),
+                minimumLevel: 2,
+                maximumLevel: 18,
+            }),
+        ];
 
-    // レイヤーを追加
-    const layerSatellite = layers.addImageryProvider(satelliteProvider);
-    const layerGSI = layers.addImageryProvider(gsiProvider);
-    const layerOlds = providersOld.map((p) => layers.addImageryProvider(p));
+        const layerSatellite = layers.addImageryProvider(satelliteProvider);
+        const layerGSI = layers.addImageryProvider(gsiProvider);
+        const layerOlds = providersOld.map((p) => layers.addImageryProvider(p));
 
-    // 見た目調整
-    [layerSatellite, layerGSI, ...layerOlds].forEach((l) => {
-        l.alpha = 1.0;
-        l.brightness = 0.95;
-    });
+        [layerSatellite, layerGSI, ...layerOlds].forEach((l) => {
+            l.alpha = 1.0;
+            l.brightness = 0.95;
+        });
 
-    // まず全OFF → 衛星のみON
-    function allOff() {
-        layerSatellite.show = false;
-        layerGSI.show = false;
-        layerOlds.forEach((l) => (l.show = false));
-    }
-    allOff();
-    layerSatellite.show = true;
-
-    // 排他的切替
-    function showSatellite() {
+        function allOff() {
+            layerSatellite.show = false;
+            layerGSI.show = false;
+            layerOlds.forEach((l) => (l.show = false));
+        }
         allOff();
         layerSatellite.show = true;
-        layers.lowerToBottom(layerSatellite);
+
+        function setActive(id) {
+            const ids = ["btn-gsi", "btn-satellite", "btn-old"];
+            ids.forEach((x) => {
+                const el = document.getElementById(x);
+                if (el) el.classList.toggle("active", x === id);
+            });
+        }
+
+        function showSatellite() {
+            allOff();
+            layerSatellite.show = true;
+            layers.lowerToBottom(layerSatellite);
+            setActive("btn-satellite");
+        }
+        function showGSI() {
+            allOff();
+            layerGSI.show = true;
+            layers.lowerToBottom(layerGSI);
+            setActive("btn-gsi");
+        }
+        function showOldMaps() {
+            allOff();
+            layerOlds.forEach((l) => (l.show = true));
+            layers.raiseToTop(layerOlds[layerOlds.length - 1]);
+            setActive("btn-old");
+        }
+
+        const btnSat = document.getElementById("btn-satellite");
+        const btnGsi = document.getElementById("btn-gsi");
+        const btnOld = document.getElementById("btn-old");
+        if (btnSat) btnSat.onclick = showSatellite;
+        if (btnGsi) btnGsi.onclick = showGSI;
+        if (btnOld) btnOld.onclick = showOldMaps;
         setActive("btn-satellite");
-    }
-    function showGSI() {
-        allOff();
-        layerGSI.show = true;
-        layers.lowerToBottom(layerGSI);
-        setActive("btn-gsi");
-    }
-    function showOldMaps() {
-        allOff();
-        layerOlds.forEach((l) => (l.show = true));
-        layers.raiseToTop(layerOlds[layerOlds.length - 1]);
-        setActive("btn-old");
-    }
 
-    // アクティブ状態
-    function setActive(id) {
-        const ids = ["btn-gsi", "btn-satellite", "btn-old"];
-        ids.forEach((x) => {
-            const el = document.getElementById(x);
-            if (el) el.classList.toggle("active", x === id);
-        });
-    }
-
-    // ボタンにイベント付与
-    const btnSat = document.getElementById("btn-satellite");
-    const btnGsi = document.getElementById("btn-gsi");
-    const btnOld = document.getElementById("btn-old");
-    if (btnSat) btnSat.onclick = showSatellite;
-    if (btnGsi) btnGsi.onclick = showGSI;
-    if (btnOld) btnOld.onclick = showOldMaps;
-    setActive("btn-satellite");
-
-    // ===== ルート（GeoJSON） =====
-    const routeGeojson = {
-        type: "FeatureCollection",
-        name: "route",
-        crs: { type: "name", properties: { name: "urn:ogc:def:crs:OGC:1.3:CRS84" } },
-        features: [
-            {
-                type: "Feature",
-                properties: { name: "B", style: "arrow" },
-                geometry: {
-                    type: "MultiLineString",
-                    coordinates: [
-                        [
-                            [135.268016508585703, 34.868577144026894, 550],
-                            [135.279153323744339, 34.869041754901545, 550],
-                            [135.28708122606065, 34.878604412245679, 550],
-                            [135.290384518692491, 34.876707455305308, 550]
+        // ===== ルート（GeoJSON） =====
+        const routeGeojson = {
+            type: "FeatureCollection",
+            name: "route",
+            crs: { type: "name", properties: { name: "urn:ogc:def:crs:OGC:1.3:CRS84" } },
+            features: [
+                {
+                    type: "Feature",
+                    properties: { name: "B", style: "arrow" },
+                    geometry: {
+                        type: "MultiLineString",
+                        coordinates: [
+                            [
+                                [135.2680165085857, 34.868577144026894, 550],
+                                [135.27915332374434, 34.869041754901545, 550],
+                                [135.28708122606065, 34.87860441224568, 550],
+                                [135.2903845186925, 34.87670745530531, 550],
+                            ],
                         ],
-                    ],
+                    },
                 },
-            },
-        ],
-    };
+            ],
+        };
 
-    // ===== GeoJSON読込＋スタイル =====
-    const guideBEntities = [];
-
-    try {
+        const guideBEntities = [];
         const ds = await Cesium.GeoJsonDataSource.load(routeGeojson);
         viewer.dataSources.add(ds);
 
+        // ラベル/ポイントのスケーリング設定をまとめる
+        function applyCalloutStyle(entity, textFontPxBase = 18) {
+            if (!entity.label && !entity.point) return;
+
+            if (entity.point) {
+                entity.point.pixelSize = Math.round(8 * uiScale);
+                entity.point.outlineWidth = Math.round(2 * uiScale);
+            }
+
+            if (entity.label) {
+                entity.label.font = `bold ${px(textFontPxBase)} sans-serif`;
+                entity.label.outlineWidth = Math.max(2, Math.round(3 * uiScale));
+                entity.label.pixelOffset = new Cesium.Cartesian2(0, -Math.round(8 * uiScale));
+                // 近いと少し大きく、遠いと少し小さく
+                entity.label.scaleByDistance = new Cesium.NearFarScalar(
+                    300.0, 1.0 * uiScale,  // 300mで基準
+                    8000.0, 0.7 * uiScale   // 8kmで少し縮む
+                );
+            }
+        }
+
+        // GeoJSONのスタイル適用
         for (const entity of ds.entities.values) {
             const p = entity.properties;
             const style = p?.style?.getValue?.();
@@ -149,7 +174,7 @@ Cesium.Ion.defaultAccessToken =
             if (entity.polyline) {
                 if (style === "arrow" || name === "B") {
                     const yellowTrans = Cesium.Color.YELLOW.withAlpha(0.5);
-                    entity.polyline.width = 25;
+                    entity.polyline.width = Math.round(25 * uiScale);
                     entity.polyline.material = new Cesium.PolylineArrowMaterialProperty(yellowTrans);
                     entity.polyline.clampToGround = false;
                     entity.polyline.heightReference = Cesium.HeightReference.NONE;
@@ -160,7 +185,7 @@ Cesium.Ion.defaultAccessToken =
                         gapColor: Cesium.Color.TRANSPARENT,
                         dashLength: 17,
                     });
-                    entity.polyline.width = 4;
+                    entity.polyline.width = Math.round(4 * uiScale);
                     entity.polyline.clampToGround = true;
                 }
             }
@@ -169,10 +194,7 @@ Cesium.Ion.defaultAccessToken =
         // ===== コールアウト関数 =====
         async function addCallout(viewer, lon, lat, lift, text) {
             const carto = Cesium.Cartographic.fromDegrees(lon, lat);
-            const [updated] = await Cesium.sampleTerrainMostDetailed(
-                viewer.terrainProvider,
-                [carto]
-            );
+            const [updated] = await Cesium.sampleTerrainMostDetailed(viewer.terrainProvider, [carto]);
             const groundH = (updated && updated.height) || 0;
 
             const groundPos = Cesium.Cartesian3.fromDegrees(lon, lat, groundH);
@@ -182,114 +204,133 @@ Cesium.Ion.defaultAccessToken =
             viewer.entities.add({
                 polyline: {
                     positions: [groundPos, airPos],
-                    width: 2,
+                    width: Math.max(2, Math.round(2 * uiScale)),
                     material: Cesium.Color.BLUE.withAlpha(0.9),
                     clampToGround: false,
                 },
             });
 
-            // 地面のポイント
-            viewer.entities.add({
+            // 地面ポイント
+            const pt = viewer.entities.add({
                 position: groundPos,
                 point: {
-                    pixelSize: 8,
+                    pixelSize: Math.round(8 * uiScale),
                     color: Cesium.Color.RED,
                     outlineColor: Cesium.Color.WHITE,
-                    outlineWidth: 2,
+                    outlineWidth: Math.round(2 * uiScale),
                 },
             });
 
             // 空中ラベル
-            viewer.entities.add({
+            const lb = viewer.entities.add({
                 position: airPos,
                 label: {
                     text: text,
-                    font: "14pt sans-serif",
+                    font: `bold ${px(18)} sans-serif`,
                     style: Cesium.LabelStyle.FILL_AND_OUTLINE,
                     fillColor: Cesium.Color.WHITE,
                     outlineColor: Cesium.Color.BLACK,
-                    outlineWidth: 3,
+                    outlineWidth: Math.max(2, Math.round(3 * uiScale)),
                     verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+                    pixelOffset: new Cesium.Cartesian2(0, -Math.round(8 * uiScale)),
                     disableDepthTestDistance: Number.POSITIVE_INFINITY,
+                    scaleByDistance: new Cesium.NearFarScalar(300.0, 1.0 * uiScale, 8000.0, 0.7 * uiScale),
                 },
+            });
+
+            // 念のためスタイル適用（将来の一括更新にも対応）
+            applyCalloutStyle(pt);
+            applyCalloutStyle(lb);
+        }
+
+        // ===== 11個のポイント =====
+        const calloutPoints = [
+            { lon: 135.26810285504533, lat: 34.86791223312818, lift: 150, text: "1" },
+            { lon: 135.272092579146, lat: 34.86818861958434, lift: 150, text: "2" },
+            { lon: 135.2755454274442, lat: 34.869371888597385, lift: 150, text: "3" },
+            { lon: 135.2774929181002, lat: 34.86988146635745, lift: 150, text: "4" },
+            { lon: 135.28293536496045, lat: 34.871531094734046, lift: 150, text: "5" },
+            { lon: 135.28335425024352, lat: 34.87271478178891, lift: 150, text: "6" },
+            { lon: 135.28402208984082, lat: 34.873732325977016, lift: 150, text: "7" },
+            { lon: 135.2876475047976, lat: 34.876993600682056, lift: 150, text: "8" },
+            { lon: 135.28936480661923, lat: 34.87743712404752, lift: 150, text: "9" },
+            { lon: 135.287615702912, lat: 34.87738494495227, lift: 150, text: "10" },
+            { lon: 135.29057327827147, lat: 34.876393535849175, lift: 150, text: "11" },
+        ];
+        for (const p of calloutPoints) await addCallout(viewer, p.lon, p.lat, p.lift, p.text);
+
+        viewer.flyTo(ds);
+
+        // ===== 線Bトグル =====
+        function setGuideBVisible(flag) {
+            guideBEntities.forEach((ent) => (ent.show = flag));
+        }
+        setGuideBVisible(true);
+
+        (function initGuideBToggle() {
+            let btn = document.getElementById("btn-guideB");
+            if (!btn) {
+                const holder = document.createElement("div");
+                holder.style.position = "absolute";
+                holder.style.top = "calc(10px + env(safe-area-inset-top))";
+                holder.style.right = "calc(10px + env(safe-area-inset-right))";
+                holder.style.zIndex = "10";
+                holder.style.background = "rgba(0,0,0,.45)";
+                holder.style.backdropFilter = "blur(6px)";
+                holder.style.borderRadius = "12px";
+                holder.style.padding = "6px";
+
+                btn = document.createElement("button");
+                btn.id = "btn-guideB";
+                btn.textContent = "Summary Route:ON";
+                btn.style.border = "none";
+                btn.style.padding = `calc(8px * ${uiScale}) calc(12px * ${uiScale})`;
+                btn.style.borderRadius = "10px";
+                btn.style.cursor = "pointer";
+                btn.style.color = "#fff";
+                btn.style.background = "#2d8cff";
+                btn.style.minHeight = `calc(44px * ${uiScale})`;
+
+                holder.appendChild(btn);
+                document.body.appendChild(holder);
+            } else {
+                btn.classList.add("active");
+            }
+
+            let visible = true;
+            const refreshLook = () => {
+                if (btn.classList) btn.classList.toggle("active", visible);
+                btn.textContent = visible ? "Summary Route:ON" : "Summary Route:OFF";
+                btn.style.background = visible ? "#2d8cff" : "rgba(255,255,255,.14)";
+            };
+            refreshLook();
+
+            btn.onclick = () => {
+                visible = !visible;
+                setGuideBVisible(visible);
+                refreshLook();
+            };
+        })();
+
+        // ===== 画面回転・リサイズ時も文字を再調整 =====
+        function updateAllLabelPointStyles() {
+            uiScale = computeUiScale();
+            document.documentElement.style.setProperty("--ui-scale", String(uiScale));
+
+            // 既存エンティティ反映
+            viewer.entities.values.forEach((e) => applyCalloutStyle(e));
+            ds.entities.values.forEach((e) => applyCalloutStyle(e));
+
+            // 線の太さも少し追従（任意）
+            guideBEntities.forEach((e) => {
+                if (e.polyline) e.polyline.width = Math.round(25 * uiScale);
             });
         }
 
-        // ===== 11個のポイント定義 =====
-        const calloutPoints = [
-            { lon: 135.268102855045328, lat: 34.86791223312818, lift: 150, text: "1" },
-            { lon: 135.272092579146005, lat: 34.868188619584338, lift: 150, text: "2" },
-            { lon: 135.2755454274442, lat: 34.869371888597385, lift: 150, text: "3" },
-            { lon: 135.277492918100194, lat: 34.869881466357448, lift: 150, text: "4" },
-            { lon: 135.282935364960451, lat: 34.871531094734046, lift: 150, text: "5" },
-            { lon: 135.283354250243519, lat: 34.872714781788908, lift: 150, text: "6" },
-            { lon: 135.284022089840818, lat: 34.873732325977016, lift: 150, text: "7" },
-            { lon: 135.287647504797604, lat: 34.876993600682056, lift: 150, text: "8" },
-            { lon: 135.289364806619233, lat: 34.877437124047518, lift: 150, text: "9" },
-            { lon: 135.287615702912007, lat: 34.877384944952269, lift: 150, text: "10" },
-            { lon: 135.290573278271467, lat: 34.876393535849175, lift: 150, text: "11" },
-        ];
-
-        // 一括追加
-        for (const point of calloutPoints) {
-            await addCallout(viewer, point.lon, point.lat, point.lift, point.text);
-        }
-
-        viewer.flyTo(ds);
-    } catch (e) {
-        console.error("GeoJSON読み込みエラー:", e);
-    }
-
-    // ===== 線Bトグル =====
-    function setGuideBVisible(flag) {
-        guideBEntities.forEach((ent) => (ent.show = flag));
-    }
-    setGuideBVisible(true);
-
-    (function initGuideBToggle() {
-        let btn = document.getElementById("btn-guideB");
-        if (!btn) {
-            const holder = document.createElement("div");
-            holder.style.position = "absolute";
-            holder.style.top = "10px";
-            holder.style.right = "10px";
-            holder.style.zIndex = "10";
-            holder.style.background = "rgba(0,0,0,.45)";
-            holder.style.backdropFilter = "blur(6px)";
-            holder.style.borderRadius = "12px";
-            holder.style.padding = "6px";
-
-            btn = document.createElement("button");
-            btn.id = "btn-guideB";
-            btn.textContent = "Summary Route:ON";
-            btn.style.border = "none";
-            btn.style.padding = "6px 10px";
-            btn.style.borderRadius = "8px";
-            btn.style.cursor = "pointer";
-            btn.style.color = "#fff";
-            btn.style.background = "#2d8cff";
-
-            holder.appendChild(btn);
-            document.body.appendChild(holder);
-        } else {
-            btn.classList.add("active");
-        }
-
-        let visible = true;
-        const refreshLook = () => {
-            if (btn.classList) {
-                btn.classList.toggle("active", visible);
-            } else {
-                btn.style.background = visible ? "#2d8cff" : "rgba(255,255,255,.12)";
-            }
-            btn.textContent = visible ? "Summary Route:ON" : "Summary Route:OFF";
-        };
-        refreshLook();
-
-        btn.onclick = () => {
-            visible = !visible;
-            setGuideBVisible(visible);
-            refreshLook();
-        };
-    })();
+        let resizeTimer = null;
+        window.addEventListener("resize", () => {
+            if (resizeTimer) cancelAnimationFrame(resizeTimer);
+            resizeTimer = requestAnimationFrame(updateAllLabelPointStyles);
+        });
+    })().catch(console.error);
 })();
