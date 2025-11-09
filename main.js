@@ -190,7 +190,7 @@ Cesium.Ion.defaultAccessToken =
                 polyline: {
                     positions: [groundPos, airPos],
                     width: 2,
-                    material: Cesium.Color.WHITE.withAlpha(0.9),
+                    material: Cesium.Color.BLACK.withAlpha(0.7),
                     clampToGround: false, // 垂直線にするので false
                 },
             });
