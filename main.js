@@ -226,7 +226,7 @@ Cesium.Ion.defaultAccessToken =
         }
 
         // 使い方（viewer 初期化後に）
-        addCallout(viewer, lon, lat, 30, "1");
+        addCallout(viewer, lon, lat, 150, "1");
 
 
 
