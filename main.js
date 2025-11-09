@@ -50,7 +50,7 @@ Cesium.Ion.defaultAccessToken =
             minimumLevel: 2,
             maximumLevel: 18,
         }),
-        
+
     ];
 
     // レイヤーを一度だけ追加して参照保持
@@ -118,7 +118,7 @@ Cesium.Ion.defaultAccessToken =
         name: "route",
         crs: { type: "name", properties: { name: "urn:ogc:def:crs:OGC:1.3:CRS84" } },
         features: [
-            
+
             {
                 type: "Feature",
                 properties: { name: "B", style: "arrow" },
@@ -167,31 +167,67 @@ Cesium.Ion.defaultAccessToken =
             }
         }
 
-        // スタート／ゴール（任意）
-        viewer.entities.add({
-            id: "1",                   // 任意の固定ID（なくてもOK）
-            name: "1",
-            description: `
-    <h3>1</h3>
-    <p>PTP情報: ---</p>
-    <ul>
-      <li>標高: --- </li>
-      <li>座標: --- </li>
-    </ul>
-  `,
-            position: Cesium.Cartesian3.fromDegrees(135.268102855045328, 34.86791223312818, 150),
-            point: { pixelSize: 8, color: Cesium.Color.RED, outlineColor: Cesium.Color.WHITE, outlineWidth: 2 },
-            label: {
-                text: "Start",
-                font: "14pt sans-serif",
-                style: Cesium.LabelStyle.FILL_AND_OUTLINE,
-                fillColor: Cesium.Color.WHITE,
-                outlineColor: Cesium.Color.BLACK,
-                outlineWidth: 3,
-                verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
-                pixelOffset: new Cesium.Cartesian2(0, -9),
-            },
-        });
+        // lon/lat とラベルの浮かせ量（m）
+        const lon = 135.268102855045328;
+        const lat = 34.86791223312818;
+        const lift = 500; // 地表から 150 m 浮かせる例
+
+        async function addCallout(viewer, lon, lat, lift, text = "1") {
+            // 1) 地表高を取得
+            const carto = Cesium.Cartographic.fromDegrees(lon, lat);
+            const [updated] = await Cesium.sampleTerrainMostDetailed(
+                viewer.terrainProvider,
+                [carto]
+            );
+            const groundH = (updated && updated.height) || 0;
+
+            // 2) 地面座標と浮かせ座標
+            const groundPos = Cesium.Cartesian3.fromDegrees(lon, lat, groundH);
+            const airPos = Cesium.Cartesian3.fromDegrees(lon, lat, groundH + lift);
+
+            // 3) 引出線（地面→空中ラベル）
+            viewer.entities.add({
+                polyline: {
+                    positions: [groundPos, airPos],
+                    width: 2,
+                    material: Cesium.Color.WHITE.withAlpha(0.9),
+                    clampToGround: false, // 垂直線にするので false
+                },
+            });
+
+            // 4) 地面のポイント（任意）
+            viewer.entities.add({
+                position: groundPos,
+                point: {
+                    pixelSize: 8,
+                    color: Cesium.Color.RED,
+                    outlineColor: Cesium.Color.WHITE,
+                    outlineWidth: 2,
+                },
+            });
+
+            // 5) 空中ラベル本体
+            viewer.entities.add({
+                position: airPos,
+                label: {
+                    text,
+                    font: "14pt sans-serif",
+                    style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+                    fillColor: Cesium.Color.WHITE,
+                    outlineColor: Cesium.Color.BLACK,
+                    outlineWidth: 3,
+                    verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+                    // 深度テストを無効化して地形の陰でも読めるように
+                    disableDepthTestDistance: Number.POSITIVE_INFINITY,
+                    // 遠近で消したい場合は DistanceDisplayCondition を使う
+                    // distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 200000.0),
+                },
+            });
+        }
+
+        // 使い方（viewer 初期化後に）
+        addCallout(viewer, lon, lat, 30, "1");
+
 
 
         viewer.flyTo(ds);
