@@ -167,10 +167,11 @@ Cesium.Ion.defaultAccessToken =
             }
         }
 
+        // plot 1
         // lon/lat とラベルの浮かせ量（m）
         const lon = 135.268102855045328;
         const lat = 34.86791223312818;
-        const lift = 500; // 地表から 150 m 浮かせる例
+        const lift = 200; // 地表から 150 m 浮かせる例
 
         async function addCallout(viewer, lon, lat, lift, text = "1") {
             // 1) 地表高を取得
@@ -228,6 +229,68 @@ Cesium.Ion.defaultAccessToken =
         // 使い方（viewer 初期化後に）
         addCallout(viewer, lon, lat, lift, "1");
 
+
+        // plot 2
+        // lon/lat とラベルの浮かせ量（m）
+        const lon = 135.272092579146005;
+        const lat = 34.868188619584338;
+        const lift = 200; // 地表から 150 m 浮かせる例
+
+        async function addCallout(viewer, lon, lat, lift, text = "2") {
+            // 1) 地表高を取得
+            const carto = Cesium.Cartographic.fromDegrees(lon, lat);
+            const [updated] = await Cesium.sampleTerrainMostDetailed(
+                viewer.terrainProvider,
+                [carto]
+            );
+            const groundH = (updated && updated.height) || 0;
+
+            // 2) 地面座標と浮かせ座標
+            const groundPos = Cesium.Cartesian3.fromDegrees(lon, lat, groundH);
+            const airPos = Cesium.Cartesian3.fromDegrees(lon, lat, groundH + lift);
+
+            // 3) 引出線（地面→空中ラベル）
+            viewer.entities.add({
+                polyline: {
+                    positions: [groundPos, airPos],
+                    width: 2,
+                    material: Cesium.Color.BLUE.withAlpha(0.7),
+                    clampToGround: false, // 垂直線にするので false
+                },
+            });
+
+            // 4) 地面のポイント（任意）
+            viewer.entities.add({
+                position: groundPos,
+                point: {
+                    pixelSize: 8,
+                    color: Cesium.Color.RED,
+                    outlineColor: Cesium.Color.WHITE,
+                    outlineWidth: 2,
+                },
+            });
+
+            // 5) 空中ラベル本体
+            viewer.entities.add({
+                position: airPos,
+                label: {
+                    text,
+                    font: "14pt sans-serif",
+                    style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+                    fillColor: Cesium.Color.WHITE,
+                    outlineColor: Cesium.Color.BLACK,
+                    outlineWidth: 3,
+                    verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+                    // 深度テストを無効化して地形の陰でも読めるように
+                    disableDepthTestDistance: Number.POSITIVE_INFINITY,
+                    // 遠近で消したい場合は DistanceDisplayCondition を使う
+                    // distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 200000.0),
+                },
+            });
+        }
+
+        // 使い方（viewer 初期化後に）
+        addCallout(viewer, lon, lat, lift, "2");
 
 
         viewer.flyTo(ds);
