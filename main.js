@@ -12,7 +12,7 @@ Cesium.Ion.defaultAccessToken =
         homeButton: false,
     });
 
-    // 既定ベースレイヤーを完全に除去（ボタンでの誤動作防止）
+    // 既定ベースレイヤーを完全に除去
     while (viewer.imageryLayers.length > 0) {
         viewer.imageryLayers.remove(viewer.imageryLayers.get(0), false);
     }
@@ -42,24 +42,22 @@ Cesium.Ion.defaultAccessToken =
         maximumLevel: 18,
     });
 
-    // 古地図4枚
+    // 古地図
     const providersOld = [
         new Cesium.UrlTemplateImageryProvider({
-            url: "https://mapwarper.h-gis.jp/maps/tile/3544/{z}/{x}/{y}.png", // 広根
-            credit: new Cesium.Credit("『広根』五万分一地形圖,  https://www.gsi.go.jp/"),
+            url: "https://mapwarper.h-gis.jp/maps/tile/3544/{z}/{x}/{y}.png",
+            credit: new Cesium.Credit("『広根』五万分一地形圖, https://www.gsi.go.jp/"),
             minimumLevel: 2,
             maximumLevel: 18,
         }),
-
     ];
 
-    // レイヤーを一度だけ追加して参照保持
-    const layerSatellite = layers.addImageryProvider(satelliteProvider); // 衛星
-    const layerGSI = layers.addImageryProvider(gsiProvider); // 地理院
+    // レイヤーを追加
+    const layerSatellite = layers.addImageryProvider(satelliteProvider);
+    const layerGSI = layers.addImageryProvider(gsiProvider);
+    const layerOlds = providersOld.map((p) => layers.addImageryProvider(p));
 
-    const layerOlds = providersOld.map((p) => layers.addImageryProvider(p)); // 古地図4枚
-
-    // 見た目調整（任意）
+    // 見た目調整
     [layerSatellite, layerGSI, ...layerOlds].forEach((l) => {
         l.alpha = 1.0;
         l.brightness = 0.95;
@@ -94,7 +92,7 @@ Cesium.Ion.defaultAccessToken =
         setActive("btn-old");
     }
 
-    // アクティブ状態（任意・見た目用）
+    // アクティブ状態
     function setActive(id) {
         const ids = ["btn-gsi", "btn-satellite", "btn-old"];
         ids.forEach((x) => {
@@ -103,7 +101,7 @@ Cesium.Ion.defaultAccessToken =
         });
     }
 
-    // ボタンにイベント付与（存在する場合のみ）
+    // ボタンにイベント付与
     const btnSat = document.getElementById("btn-satellite");
     const btnGsi = document.getElementById("btn-gsi");
     const btnOld = document.getElementById("btn-old");
@@ -118,7 +116,6 @@ Cesium.Ion.defaultAccessToken =
         name: "route",
         crs: { type: "name", properties: { name: "urn:ogc:def:crs:OGC:1.3:CRS84" } },
         features: [
-
             {
                 type: "Feature",
                 properties: { name: "B", style: "arrow" },
@@ -126,7 +123,10 @@ Cesium.Ion.defaultAccessToken =
                     type: "MultiLineString",
                     coordinates: [
                         [
-                            [135.268016508585703, 34.868577144026894, 550], [135.279153323744339, 34.869041754901545, 550], [135.28708122606065, 34.878604412245679, 550], [135.290384518692491, 34.876707455305308, 550]
+                            [135.268016508585703, 34.868577144026894, 550],
+                            [135.279153323744339, 34.869041754901545, 550],
+                            [135.28708122606065, 34.878604412245679, 550],
+                            [135.290384518692491, 34.876707455305308, 550]
                         ],
                     ],
                 },
@@ -134,8 +134,8 @@ Cesium.Ion.defaultAccessToken =
         ],
     };
 
-    // ===== GeoJSON読込＋スタイル & 線B参照収集 =====
-    const guideBEntities = []; // B（空中ガイド）をここに集める
+    // ===== GeoJSON読込＋スタイル =====
+    const guideBEntities = [];
 
     try {
         const ds = await Cesium.GeoJsonDataSource.load(routeGeojson);
@@ -153,8 +153,7 @@ Cesium.Ion.defaultAccessToken =
                     entity.polyline.material = new Cesium.PolylineArrowMaterialProperty(yellowTrans);
                     entity.polyline.clampToGround = false;
                     entity.polyline.heightReference = Cesium.HeightReference.NONE;
-
-                    guideBEntities.push(entity); // Bを収集
+                    guideBEntities.push(entity);
                 } else {
                     entity.polyline.material = new Cesium.PolylineDashMaterialProperty({
                         color: Cesium.Color.RED,
@@ -167,13 +166,8 @@ Cesium.Ion.defaultAccessToken =
             }
         }
 
-        // lon/lat とラベルの浮かせ量（m）
-        const lon = 135.268102855045328;
-        const lat = 34.86791223312818;
-        const lift = 500; // 地表から 150 m 浮かせる例
-
-        async function addCallout(viewer, lon, lat, lift, text = "1") {
-            // 1) 地表高を取得
+        // ===== コールアウト関数 =====
+        async function addCallout(viewer, lon, lat, lift, text) {
             const carto = Cesium.Cartographic.fromDegrees(lon, lat);
             const [updated] = await Cesium.sampleTerrainMostDetailed(
                 viewer.terrainProvider,
@@ -181,21 +175,20 @@ Cesium.Ion.defaultAccessToken =
             );
             const groundH = (updated && updated.height) || 0;
 
-            // 2) 地面座標と浮かせ座標
             const groundPos = Cesium.Cartesian3.fromDegrees(lon, lat, groundH);
             const airPos = Cesium.Cartesian3.fromDegrees(lon, lat, groundH + lift);
 
-            // 3) 引出線（地面→空中ラベル）
+            // 引出線
             viewer.entities.add({
                 polyline: {
                     positions: [groundPos, airPos],
                     width: 2,
                     material: Cesium.Color.WHITE.withAlpha(0.9),
-                    clampToGround: false, // 垂直線にするので false
+                    clampToGround: false,
                 },
             });
 
-            // 4) 地面のポイント（任意）
+            // 地面のポイント
             viewer.entities.add({
                 position: groundPos,
                 point: {
@@ -206,47 +199,56 @@ Cesium.Ion.defaultAccessToken =
                 },
             });
 
-            // 5) 空中ラベル本体
+            // 空中ラベル
             viewer.entities.add({
                 position: airPos,
                 label: {
-                    text,
+                    text: text,
                     font: "14pt sans-serif",
                     style: Cesium.LabelStyle.FILL_AND_OUTLINE,
                     fillColor: Cesium.Color.WHITE,
                     outlineColor: Cesium.Color.BLACK,
                     outlineWidth: 3,
                     verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
-                    // 深度テストを無効化して地形の陰でも読めるように
                     disableDepthTestDistance: Number.POSITIVE_INFINITY,
-                    // 遠近で消したい場合は DistanceDisplayCondition を使う
-                    // distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 200000.0),
                 },
             });
         }
 
-        // 使い方（viewer 初期化後に）
-        addCallout(viewer, lon, lat, 150, "1");
+        // ===== 11個のポイント定義 =====
+        const calloutPoints = [
+            { lon: 135.268102855045328, lat: 34.86791223312818, lift: 150, text: "1" },
+            { lon: 135.270000000000000, lat: 34.86800000000000, lift: 150, text: "2" },
+            { lon: 135.272000000000000, lat: 34.86850000000000, lift: 150, text: "3" },
+            { lon: 135.274000000000000, lat: 34.86900000000000, lift: 150, text: "4" },
+            { lon: 135.276000000000000, lat: 34.87000000000000, lift: 150, text: "5" },
+            { lon: 135.278000000000000, lat: 34.87100000000000, lift: 150, text: "6" },
+            { lon: 135.280000000000000, lat: 34.87200000000000, lift: 150, text: "7" },
+            { lon: 135.282000000000000, lat: 34.87300000000000, lift: 150, text: "8" },
+            { lon: 135.284000000000000, lat: 34.87400000000000, lift: 150, text: "9" },
+            { lon: 135.286000000000000, lat: 34.87500000000000, lift: 150, text: "10" },
+            { lon: 135.288000000000000, lat: 34.87600000000000, lift: 150, text: "11" },
+        ];
 
-
+        // 一括追加
+        for (const point of calloutPoints) {
+            await addCallout(viewer, point.lon, point.lat, point.lift, point.text);
+        }
 
         viewer.flyTo(ds);
     } catch (e) {
         console.error("GeoJSON読み込みエラー:", e);
     }
 
-    // ===== 線B（空中ガイド）の表示トグル =====
+    // ===== 線Bトグル =====
     function setGuideBVisible(flag) {
         guideBEntities.forEach((ent) => (ent.show = flag));
     }
-    // 既定：表示ON
     setGuideBVisible(true);
 
-    // ボタン（id="btn-guideB" があれば利用）／なければ自動生成
     (function initGuideBToggle() {
         let btn = document.getElementById("btn-guideB");
         if (!btn) {
-            // 自動で小さなトグルを作る（HTMLを触らずに済む）
             const holder = document.createElement("div");
             holder.style.position = "absolute";
             holder.style.top = "10px";
@@ -259,7 +261,7 @@ Cesium.Ion.defaultAccessToken =
 
             btn = document.createElement("button");
             btn.id = "btn-guideB";
-            btn.textContent = "空中ガイド B";
+            btn.textContent = "Summary Route:ON";
             btn.style.border = "none";
             btn.style.padding = "6px 10px";
             btn.style.borderRadius = "8px";
@@ -270,7 +272,6 @@ Cesium.Ion.defaultAccessToken =
             holder.appendChild(btn);
             document.body.appendChild(holder);
         } else {
-            // 既存スタイルに合わせて .active 反映
             btn.classList.add("active");
         }
 
@@ -279,7 +280,6 @@ Cesium.Ion.defaultAccessToken =
             if (btn.classList) {
                 btn.classList.toggle("active", visible);
             } else {
-                // 生成ボタン用（色でON/OFF表現）
                 btn.style.background = visible ? "#2d8cff" : "rgba(255,255,255,.12)";
             }
             btn.textContent = visible ? "Summary Route:ON" : "Summary Route:OFF";
