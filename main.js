@@ -149,6 +149,7 @@ Cesium.Ion.defaultAccessToken =
             ],
         };
 
+        const guideAEntities = [];
         const guideBEntities = [];
         const ds = await Cesium.GeoJsonDataSource.load(routeGeojson);
         viewer.dataSources.add(ds);
@@ -182,6 +183,7 @@ Cesium.Ion.defaultAccessToken =
 
             if (entity.polyline) {
                 if (style === "arrow" || name === "B") {
+                    // 線B（矢印）
                     const yellowTrans = Cesium.Color.YELLOW.withAlpha(0.5);
                     entity.polyline.width = Math.round(25 * uiScale);
                     entity.polyline.material = new Cesium.PolylineArrowMaterialProperty(yellowTrans);
@@ -189,6 +191,7 @@ Cesium.Ion.defaultAccessToken =
                     entity.polyline.heightReference = Cesium.HeightReference.NONE;
                     guideBEntities.push(entity);
                 } else {
+                    // 線A（赤の点線）
                     entity.polyline.material = new Cesium.PolylineDashMaterialProperty({
                         color: Cesium.Color.RED,
                         gapColor: Cesium.Color.TRANSPARENT,
@@ -196,8 +199,10 @@ Cesium.Ion.defaultAccessToken =
                     });
                     entity.polyline.width = Math.round(4 * uiScale);
                     entity.polyline.clampToGround = true;
+                    if (name === "A") guideAEntities.push(entity);
                 }
             }
+
         }
 
         // ===== コールアウト関数 =====
@@ -271,15 +276,22 @@ Cesium.Ion.defaultAccessToken =
         viewer.flyTo(ds);
 
         // ===== 線Bトグル =====
+        function setGuideAVisible(flag) {
+            guideAEntities.forEach((ent) => (ent.show = flag));
+        }
         function setGuideBVisible(flag) {
             guideBEntities.forEach((ent) => (ent.show = flag));
         }
+        // 既定は両方ON（従来挙動を維持）
+        setGuideAVisible(true);
         setGuideBVisible(true);
 
-        (function initGuideBToggle() {
-            let btn = document.getElementById("btn-guideB");
-            if (!btn) {
-                const holder = document.createElement("div");
+        (function initGuideToggles() {
+            // ホルダー（右上）
+            let holder = document.getElementById("btn-guide-holder");
+            if (!holder) {
+                holder = document.createElement("div");
+                holder.id = "btn-guide-holder";
                 holder.style.position = "absolute";
                 holder.style.top = "calc(10px + env(safe-area-inset-top))";
                 holder.style.right = "calc(10px + env(safe-area-inset-right))";
@@ -288,38 +300,61 @@ Cesium.Ion.defaultAccessToken =
                 holder.style.backdropFilter = "blur(6px)";
                 holder.style.borderRadius = "12px";
                 holder.style.padding = "6px";
-
-                btn = document.createElement("button");
-                btn.id = "btn-guideB";
-                btn.textContent = "Summary Route:ON";
-                btn.style.border = "none";
-                btn.style.padding = `calc(8px * ${uiScale}) calc(12px * ${uiScale})`;
-                btn.style.borderRadius = "10px";
-                btn.style.cursor = "pointer";
-                btn.style.color = "#fff";
-                btn.style.background = "#2d8cff";
-                btn.style.minHeight = `calc(44px * ${uiScale})`;
-
-                holder.appendChild(btn);
+                holder.style.display = "flex";
+                holder.style.gap = "6px";
                 document.body.appendChild(holder);
-            } else {
-                btn.classList.add("active");
             }
 
-            let visible = true;
-            const refreshLook = () => {
-                if (btn.classList) btn.classList.toggle("active", visible);
-                btn.textContent = visible ? "Summary Route:ON" : "Summary Route:OFF";
-                btn.style.background = visible ? "#2d8cff" : "rgba(255,255,255,.14)";
+            // 共通ボタン生成ヘルパ
+            const makeBtn = (id, label) => {
+                let btn = document.getElementById(id);
+                if (!btn) {
+                    btn = document.createElement("button");
+                    btn.id = id;
+                    btn.textContent = label;
+                    btn.style.border = "none";
+                    btn.style.padding = `calc(8px * ${uiScale}) calc(12px * ${uiScale})`;
+                    btn.style.borderRadius = "10px";
+                    btn.style.cursor = "pointer";
+                    btn.style.color = "#fff";
+                    btn.style.background = "#2d8cff";
+                    btn.style.minHeight = `calc(44px * ${uiScale})`;
+                    holder.appendChild(btn);
+                }
+                return btn;
             };
-            refreshLook();
 
-            btn.onclick = () => {
-                visible = !visible;
-                setGuideBVisible(visible);
-                refreshLook();
+            // 線Aボタン
+            let visibleA = true;
+            const btnA = makeBtn("btn-guideA", "Line A:ON");
+            const refreshA = () => {
+                btnA.classList.toggle("active", visibleA);
+                btnA.textContent = visibleA ? "Route:ON" : "Route:OFF";
+                btnA.style.background = visibleA ? "#2d8cff" : "rgba(255,255,255,.14)";
+            };
+            refreshA();
+            btnA.onclick = () => {
+                visibleA = !visibleA;
+                setGuideAVisible(visibleA);
+                refreshA();
+            };
+
+            // 線Bボタン
+            let visibleB = true;
+            const btnB = makeBtn("btn-guideB", "Summary Route:ON");
+            const refreshB = () => {
+                btnB.classList.toggle("active", visibleB);
+                btnB.textContent = visibleB ? "Summary Route:ON" : "Summary Route:OFF";
+                btnB.style.background = visibleB ? "#2d8cff" : "rgba(255,255,255,.14)";
+            };
+            refreshB();
+            btnB.onclick = () => {
+                visibleB = !visibleB;
+                setGuideBVisible(visibleB);
+                refreshB();
             };
         })();
+
 
         // ===== 画面回転・リサイズ時も文字を再調整 =====
         function updateAllLabelPointStyles() {
@@ -334,6 +369,10 @@ Cesium.Ion.defaultAccessToken =
             guideBEntities.forEach((e) => {
                 if (e.polyline) e.polyline.width = Math.round(25 * uiScale);
             });
+            guideAEntities.forEach((e) => {
+                if (e.polyline) e.polyline.width = Math.round(4 * uiScale);
+            });
+
         }
 
         let resizeTimer = null;
